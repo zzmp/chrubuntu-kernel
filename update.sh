@@ -19,19 +19,23 @@ setup() {
 	# Fetch ChromeOS kernel sources
 	which git || apt-get install git
 	cd /usr/src
-	git clone --depth 1 --single-branch --branch chromeos-${kernel_version:0:4} https://chromium.googlesource.com/chromiumos/third_party/kernel
+	git clone --depth 1 --single-branch --branch chromeos-${kernel_version:0:4} https://chromium.googlesource.com/chromiumos/third_party/kernel src
 }
 
 build_kernel() {
+	cd src
+
 	# Build Ubuntu kernel packages
 	which make-kpkg || apt-get install kernel-package
 	# This will fail on larger distros, as it requires mucho memory
 	make-kpkg kernel_image kernel_headers
+
+	cd -
 }
 
 install_kernel() {
 	KERNEL_DEBS=$1
-	cd kernel
+	cd src
 
 	# Create a kernel signing key
 	mkdir -p /usr/share/vboot/devkeys
