@@ -19,10 +19,7 @@ setup() {
 	# Fetch ChromeOS kernel sources
 	which git || apt-get install git
 	cd /usr/src
-	git clone https://chromium.googlesource.com/chromiumos/third_party/kernel
-	cd kernel
-	git checkout origin/chromeos-${kernel_version:0:4}
-	cd -
+	git clone --depth 1 --single-branch --branch chromeos-${kernel_version:0:4} https://chromium.googlesource.com/chromiumos/third_party/kernel
 }
 
 build_kernel() {
