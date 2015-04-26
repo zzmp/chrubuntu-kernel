@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+set -x -e
 kernel_version=`uname -r`
 
 setup() {
@@ -15,16 +15,17 @@ setup() {
 	# ChromeOS may be a 32-bit target, so apt-get the
 	# 32-bit .so's for the boot binaries to link against
 	# apt-get install libc6:i386 libssl1.0.0:i386
-}
 
-build_kernel() {
 	# Fetch ChromeOS kernel sources
 	which git || apt-get install git
 	cd /usr/src
 	git clone https://chromium.googlesource.com/chromiumos/third_party/kernel
 	cd kernel
 	git checkout origin/chromeos-${kernel_version:0:4}
+	cd -
+}
 
+build_kernel() {
 	# Build Ubuntu kernel packages
 	which make-kpkg || apt-get install kernel-package
 	# This will fail on larger distros, as it requires mucho memory
@@ -33,6 +34,8 @@ build_kernel() {
 
 install_kernel() {
 	KERNEL_DEBS=$1
+	cd kernel
+
 	# Create a kernel signing key
 	mkdir -p /usr/share/vboot/devkeys
 	# TODO
@@ -47,25 +50,25 @@ install_kernel() {
 
 	# Backup current kernel
 	tstamp=$(date +%Y-%m-%d-%H%M)
-	dd if=/dev/mmcblk0p6 of=/kernel-backup-$tstamp
+	dd if=/dev/mmcblk0p6 of=../kernel-backup-$tstamp
 	cp -Rp /lib/modules/`uname -r` /lib/modules/`uname -r`-backup-$tstamp
 
 	# Install built kernel image/modules
 	dpkg -i $KERNEL_DEBS
 
 	# Extract old kernel config
-	vbutil_kernel --verify /dev/mmcblk0p6 --verbose | tail -1 > /config-$tstamp-orig.txt
+	vbutil_kernel --verify /dev/mmcblk0p6 --verbose | tail -1 > ../config-$tstamp-orig.txt
 
 	# Add permissions to a new config
 	sed -e 's/$/ disablevmx=off/' \
-		/config-$tstamp-orig.txt > /config-$tstamp.txt
+		../config-$tstamp-orig.txt > ../config-$tstamp.txt
 
 	# Repack the new kernel
-	vbutil_kernel --pack /newkernel \
+	vbutil_kernel --pack ../newkernel \
 		--keyblock /usr/share/vboot/devkeys/kernel.keyblock \
 		--version 1 \
 		--signprivate /usr/share/vboot/devkeys/kernel_data_key.vbprivk \
-		--config=/config-$tstamp.txt \
+		--config=../config-$tstamp.txt \
 		--vmlinuz /boot/vmlinuz-`uname -r` \
 		--arch x86_64
 
@@ -73,16 +76,18 @@ install_kernel() {
 	vbutil_kernel --verify /newkernel
 
 	# Copy the new kernel to the ChrUbuntu partition
-	dd if=/newkernel of=/dev/mmcblk0p6
+	dd if=../newkernel of=/dev/mmcblk0p6
+
+	cd -
 }
 
 setup
 
 if [ $1 == 'local' ]; then
-	read "Installing kernel from source. This is a local build that will require mucho memory. Press enter to start..."
+	read -p "Installing kernel from source. This is a local build that will require mucho memory. Press enter to start..."
 	build_kernel
 	install_kernel /usr/src/linux-*.deb
 else
-	read "Installing kernel $1 (these should be linux-*.deb files). Press enter to start..."
+	read -p "Installing kernel $1 (these should be linux-*.deb files). Press enter to start..."
 	install_kernel $1
 fi
