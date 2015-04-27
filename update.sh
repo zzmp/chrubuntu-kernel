@@ -2,6 +2,7 @@
 
 set -x -e
 kernel_version=`uname -r`
+target=${1:-fake}
 
 setup() {
 	# Grab verified boot utilities from ChromeOS
@@ -20,6 +21,7 @@ setup() {
 	which git || apt-get install git
 	cd /usr/src
 	git clone --depth 1 --single-branch --branch chromeos-${kernel_version:0:4} https://chromium.googlesource.com/chromiumos/third_party/kernel
+	cd -
 }
 
 build_kernel() {
@@ -34,7 +36,6 @@ build_kernel() {
 }
 
 install_kernel() {
-	KERNEL_DEBS=$1
 	DIR=`pwd`
 	cd /usr/src/kernel
 
@@ -56,7 +57,7 @@ install_kernel() {
 	cp -Rp /lib/modules/`uname -r` /lib/modules/`uname -r`-backup-$tstamp
 
 	# Install built kernel image/modules
-	dpkg -i $KERNEL_DEBS
+	dpkg -i $DIR/kernel/$target/linux-*.deb
 
 	# Extract old kernel config
 	vbutil_kernel --verify /dev/mmcblk0p6 --verbose | tail -1 > $DIR/config-$tstamp-orig.txt
@@ -78,6 +79,7 @@ install_kernel() {
 	vbutil_kernel --verify $DIR/repacked_kernel
 
 	# Copy the new kernel to the ChrUbuntu partition
+	read -p "Copy in the repacked kernel? Ctrl-C to abort..."
 	dd if=$DIR/repacked_kernel of=/dev/mmcblk0p6
 
 	cd -
@@ -85,11 +87,14 @@ install_kernel() {
 
 setup
 
-if [ $1 == 'local' ]; then
-	read -p "Installing kernel from source. This is a local build that will require mucho memory. Press enter to start..."
+if [ $target == 'local' ]; then
+	read -p "Repacking kernel from source. This is a local build that will require mucho memory. Press enter to start..."
 	build_kernel
 	install_kernel /usr/src/linux-*.deb
+elif [ -d ./kernel/$target ]; then
+	read -p "Repacking kernel from cached version $target. Press enter to start..."
+	install_kernel $target
 else
-	read -p "Installing kernel $1 (these should be linux-*.deb files). Press enter to start..."
-	install_kernel $1
+	echo "You must specify a valid version to build."
+	exit 1
 fi
