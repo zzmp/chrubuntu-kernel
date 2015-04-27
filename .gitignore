@@ -1,1 +1,3 @@
 kernel-backup-*
+config-*
+repacked_kernel
