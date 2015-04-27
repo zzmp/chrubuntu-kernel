@@ -56,7 +56,7 @@ install_kernel() {
 	# Backup current kernel
 	tstamp=$(date +%Y-%m-%d-%H%M)
 	dd if=/dev/mmcblk0p6 of=$DIR/kernel-backup-$tstamp
-	mv -Rp /lib/modules/`uname -r` /lib/modules/`uname -r`-backup-$tstamp
+	mv /lib/modules/`uname -r` /lib/modules/`uname -r`-backup-$tstamp
 
 	# Install built kernel image/modules
 	dpkg -i $DIR/kernel/$target/linux-*.deb
