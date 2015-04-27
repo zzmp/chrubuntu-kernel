@@ -18,10 +18,12 @@ setup() {
 	# apt-get install libc6:i386 libssl1.0.0:i386
 
 	# Fetch ChromeOS kernel sources
-	which git || apt-get install git
-	cd /usr/src
-	git clone --depth 1 --single-branch --branch chromeos-${kernel_version:0:4} https://chromium.googlesource.com/chromiumos/third_party/kernel
-	cd -
+	if [ ! -d /usr/src/kernel ]; then
+		which git || apt-get install git
+		cd /usr/src
+		git clone --depth 1 --single-branch --branch chromeos-${kernel_version:0:4} https://chromium.googlesource.com/chromiumos/third_party/kernel
+		cd -
+	fi
 }
 
 build_kernel() {
