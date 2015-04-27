@@ -2,7 +2,8 @@
 
 set -x -e
 kernel_version=`uname -r`
-target=${1:-fake}
+target=$1
+install=${2:-headers}
 
 setup() {
 	# Grab verified boot utilities from ChromeOS
@@ -19,7 +20,7 @@ setup() {
 
 	# Fetch ChromeOS kernel sources
 	if [ ! -d /usr/src/kernel ]; then
-		read -p "Fetching the kernel source. Press any key to continue..."
+		echo "Fetching the kernel source..."
 		which git || apt-get install git
 		cd /usr/src
 		git clone --depth 1 --single-branch --branch chromeos-${kernel_version:0:4} https://chromium.googlesource.com/chromiumos/third_party/kernel
@@ -38,7 +39,7 @@ build_kernel() {
 	cd -
 }
 
-install_kernel() {
+install_kernel_headers() {
 	DIR=`pwd`
 	cd /usr/src/kernel
 
@@ -55,9 +56,21 @@ install_kernel() {
 	dd if=/dev/mmcblk0p6 of=$DIR/kernel-backup-$tstamp
 	mv /lib/modules/`uname -r` /lib/modules/`uname -r`-backup-$tstamp
 
-	# Install built kernel image/modules
-	read -p "Installing kernel modules. Press any key to continue..."
-	dpkg -i $DIR/kernel/$target/linux-*.deb
+	# Install built kernel headers
+	echo "Installing kernel headers..."
+	dpkg -i $DIR/kernel/$target/linux-headers*.deb
+	ln -s /usr/src/linux-headers-`uname -r` /lib/modules/build
+
+	cd -
+}
+
+install_kernel_image() {
+	DIR=`pwd`
+	cd /usr/src/kernel
+
+	# Install built kernel image
+	echo "Installing kernel image..."
+	dpkg -i $DIR/kernel/$target/linux-image*.deb
 
 	# Extract old kernel config
 	vbutil_kernel --verify /dev/mmcblk0p6 --verbose | tail -1 > $DIR/config-$tstamp-orig.txt
@@ -79,7 +92,7 @@ install_kernel() {
 	vbutil_kernel --verify $DIR/repacked_kernel
 
 	# Copy the new kernel to the ChrUbuntu partition
-	read -p "Copying in the repacked kernel. Press any key to continue..."
+	echo "Copying in the repacked kernel..."
 	dd if=$DIR/repacked_kernel of=/dev/mmcblk0p6
 
 	cd -
@@ -87,14 +100,16 @@ install_kernel() {
 
 setup
 
-if [ $target == 'local' ]; then
-	read -p "Repacking kernel from source. This is a local build that will require mucho memory. Press any key to start..."
+if [ $target == 'build' ]; then
+	read -p "Building kernel from source. This is a local build that will require mucho memory. Press any key to start..."
 	build_kernel
-	install_kernel /usr/src/linux-*.deb
 elif [ -d ./kernel/$target ]; then
 	read -p "Repacking kernel from cached version $target. Press any key to start..."
-	install_kernel $target
+	install_kernel_headers $target
+	if [ $install == 'full' ]; then
+		install_kernel_image $target
+	fi
 else
-	echo "You must specify a valid version to build."
+	echo "You must specify a valid version to repack."
 	exit 1
 fi
